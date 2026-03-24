@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "skills": {
+    "commodities-quote": {
+      "source": "octagonai/skills",
+      "sourceType": "github",
+      "computedHash": "e2a2bbcfd9fe780e50e4633a741a3818f4dc8f7a9311f0f90319f8fe8836172d"
+    },
+    "docker-compose-orchestration": {
+      "source": "manutej/luxor-claude-marketplace",
+      "sourceType": "github",
+      "computedHash": "f61af99ed5390638b98d40124bcb47837a6a2d8adcb17343a5be525989494eef"
+    },
+    "echarts": {
+      "source": "eng0ai/eng0-template-skills",
+      "sourceType": "github",
+      "computedHash": "f5b02f6fde2db6284f127d1db71838db90a10bdaf8c7b4aef2351b85947b362d"
+    },
+    "fastapi-python": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "computedHash": "1d7346210a6690d2faeb089f074c0dc20a7056c2c83ac1062a11c1b73158be72"
+    },
+    "geopolitical-driver": {
+      "source": "zhenxuanshi-ship-it/meatpiegua_skills",
+      "sourceType": "github",
+      "computedHash": "03f4d6e489eac088632f98b3acde3f5534d14b61c2965a19543e6ee5ad20dc71"
+    },
+    "political-scientist-analyst": {
+      "source": "rysweet/amplihack",
+      "sourceType": "github",
+      "computedHash": "9e92c1da39acbb188717c4318da3b08d43dd56dc60a996bd06d4791012e129e2"
+    },
+    "tailwind-css": {
+      "source": "bobmatnyc/claude-mpm-skills",
+      "sourceType": "github",
+      "computedHash": "d4d19f6b1d60306895b5c0f5bb57a4640b54ed2b6ef74121781413fc16c1bf3f"
+    }
+  }
+}
