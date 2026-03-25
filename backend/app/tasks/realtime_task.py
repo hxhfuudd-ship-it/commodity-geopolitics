@@ -1,6 +1,7 @@
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, date
+from decimal import Decimal
 from loguru import logger
 
 from app.core.cache import cache_set, cache_get, get_redis
@@ -13,6 +14,9 @@ from sqlalchemy import select
 # All commodity configs for realtime fetching
 _commodity_configs: list[dict] = []
 _task: asyncio.Task | None = None
+# Track whether we've saved today's close to DB
+_today_saved: set[str] = set()
+_today_date: date | None = None
 
 
 async def _load_commodity_configs():
@@ -70,7 +74,7 @@ async def _fetch_one(cfg: dict) -> dict:
                         "latest_price": float(p.close) if p.close else None,
                         "change_pct": float(p.change_pct) if p.change_pct else None,
                         "open": float(p.open) if p.open else None,
-                        "settle": None,
+                        "settle": float(p.settle) if p.settle else None,
                         "prev_close": None,
                         "volume": int(p.volume) if p.volume else None,
                         "open_interest": int(p.open_interest) if p.open_interest else None,
@@ -117,7 +121,7 @@ async def _fetch_all_from_db() -> list[dict]:
                                 "latest_price": float(p.close) if p.close else None,
                                 "change_pct": float(p.change_pct) if p.change_pct else None,
                                 "open": float(p.open) if p.open else None,
-                                "settle": None,
+                                "settle": float(p.settle) if p.settle else None,
                                 "prev_close": None,
                                 "volume": int(p.volume) if p.volume else None,
                                 "open_interest": int(p.open_interest) if p.open_interest else None,
@@ -138,6 +142,88 @@ async def _fetch_all_from_db() -> list[dict]:
     return items
 
 
+async def _save_realtime_to_db(items: list[dict]):
+    """将实时获取的价格写入 DB 作为当日日线数据，收盘后仍可展示今日价格"""
+    global _today_saved, _today_date
+    today = date.today()
+
+    # 日期变了，重置记录
+    if _today_date != today:
+        _today_saved = set()
+        _today_date = today
+
+    # 筛选有实时数据且今天还没写入的品种
+    to_save = [it for it in items
+               if it.get("latest_price") and it["symbol"] not in _today_saved
+               and it.get("updated_at") and "T" in str(it.get("updated_at", ""))]
+    if not to_save:
+        return
+
+    try:
+        async with async_session() as db:
+            for it in to_save:
+                sym = it["symbol"]
+                c = (await db.execute(
+                    select(Commodity).where(Commodity.symbol == sym)
+                )).scalar_one_or_none()
+                if not c:
+                    continue
+
+                # 查看今天是否已有记录
+                existing = (await db.execute(
+                    select(PriceDaily).where(
+                        PriceDaily.commodity_id == c.id,
+                        PriceDaily.trade_date == today,
+                    )
+                )).scalar_one_or_none()
+
+                price = it["latest_price"]
+                open_p = it.get("open")
+                volume = it.get("volume")
+                oi = it.get("open_interest")
+                chg = it.get("change_pct")
+                settle = it.get("settle")
+
+                if existing:
+                    # 更新今日记录（用最新价覆盖 close）
+                    existing.close = Decimal(str(price))
+                    if open_p:
+                        existing.open = Decimal(str(open_p))
+                    # high/low: 取极值
+                    if existing.high is None or Decimal(str(price)) > existing.high:
+                        existing.high = Decimal(str(price))
+                    if existing.low is None or Decimal(str(price)) < existing.low:
+                        existing.low = Decimal(str(price))
+                    if volume:
+                        existing.volume = volume
+                    if oi:
+                        existing.open_interest = oi
+                    if chg is not None:
+                        existing.change_pct = Decimal(str(chg))
+                    if settle and settle > 0:
+                        existing.settle = Decimal(str(settle))
+                else:
+                    # 新建今日记录
+                    db.add(PriceDaily(
+                        commodity_id=c.id,
+                        trade_date=today,
+                        open=Decimal(str(open_p)) if open_p else Decimal(str(price)),
+                        high=Decimal(str(price)),
+                        low=Decimal(str(price)),
+                        close=Decimal(str(price)),
+                        settle=Decimal(str(settle)) if settle and settle > 0 else None,
+                        volume=volume,
+                        open_interest=oi,
+                        change_pct=Decimal(str(chg)) if chg is not None else None,
+                    ))
+                _today_saved.add(sym)
+
+            await db.commit()
+            logger.info(f"已将 {len(to_save)} 个品种的实时价格写入DB (日期: {today})")
+    except Exception as e:
+        logger.warning(f"实时价格写入DB失败: {e}")
+
+
 async def _refresh_loop():
     """Background loop: fetch all realtime prices sequentially.
     Sequential to avoid mini_racer (V8) thread-safety crash.
@@ -148,7 +234,7 @@ async def _refresh_loop():
     # First cycle: load from DB immediately so API has data right away
     db_items = await _fetch_all_from_db()
     if db_items:
-        await cache_set("market:overview:realtime", db_items, ttl=120)
+        await cache_set("market:overview:realtime", db_items, ttl=7200)
         logger.info(f"已从数据库加载 {len(db_items)} 个品种的历史价格到缓存")
 
     consecutive_failures = 0
@@ -170,8 +256,15 @@ async def _refresh_loop():
                 except Exception as e:
                     logger.debug(f"单品种获取异常 {cfg['symbol']}: {e}")
 
-            if items:
-                await cache_set("market:overview:realtime", items, ttl=120)
+            if items and realtime_success > 0:
+                # 有实时数据，正常写缓存
+                await cache_set("market:overview:realtime", items, ttl=300)
+                await _save_realtime_to_db(items)
+            elif items:
+                # 非交易时段：只在缓存不存在时写入 DB 数据（保留上次实时数据含 settle）
+                existing_cache = await cache_get("market:overview:realtime")
+                if not existing_cache:
+                    await cache_set("market:overview:realtime", items, ttl=7200)
 
             # Back off if no realtime data (non-trading hours)
             if realtime_success == 0:

@@ -150,9 +150,39 @@ async def _build_context() -> str:
 请基于以上实时数据回答用户问题。用中文回答，分析要专业但易懂。不要使用emoji表情。善用markdown格式组织内容：用标题(###)分段，用加粗(**重点**)突出关键数据，用列表整理要点，保持层次清晰。"""
 
 
-async def chat(session_id: Optional[str], user_message: str) -> AsyncGenerator[str, None]:
+async def chat(
+    session_id: Optional[str],
+    user_message: str,
+    disconnect_check=None,
+) -> AsyncGenerator[str, None]:
     if not session_id:
         session_id = await create_session()
+
+    # Clean up dangling messages from a previously aborted/interrupted request.
+    # When the user interrupts mid-stream and sends a new question, the history
+    # may contain the old user message AND a partial assistant reply.
+    # Remove both so the LLM only sees the new topic.
+    r = get_redis()
+    key = f"chat:session:{session_id}"
+    raw = await r.get(key)
+    if raw:
+        history_msgs = json.loads(raw)
+        changed = False
+        # Remove trailing assistant message if it was from an interrupted stream
+        if history_msgs and history_msgs[-1]["role"] == "assistant":
+            # Check if the previous-to-last is a user msg (normal pair) —
+            # we pop both because this pair belongs to the interrupted request
+            # that the user abandoned by sending a new message.
+            if len(history_msgs) >= 2 and history_msgs[-2]["role"] == "user":
+                history_msgs.pop()  # remove incomplete assistant reply
+                history_msgs.pop()  # remove the old user question
+                changed = True
+        # Also handle the case where only a dangling user message exists
+        elif history_msgs and history_msgs[-1]["role"] == "user":
+            history_msgs.pop()
+            changed = True
+        if changed:
+            await r.set(key, json.dumps(history_msgs), ex=7200)
 
     await _save_message(session_id, "user", user_message)
 
@@ -164,8 +194,13 @@ async def chat(session_id: Optional[str], user_message: str) -> AsyncGenerator[s
         messages.append({"role": msg.role, "content": msg.content})
 
     full_response = ""
+    disconnected = False
     try:
         async for chunk in chat_completion_stream(messages):
+            # Check if the client has disconnected (user sent a new question)
+            if disconnect_check and await disconnect_check():
+                disconnected = True
+                break
             full_response += chunk
             yield chunk
     except Exception as e:
@@ -173,4 +208,14 @@ async def chat(session_id: Optional[str], user_message: str) -> AsyncGenerator[s
         yield error_msg
         full_response = error_msg
 
-    await _save_message(session_id, "assistant", full_response)
+    if disconnected:
+        # Client disconnected — remove the user message we just saved
+        # so the next request's cleanup starts clean.
+        raw = await r.get(key)
+        if raw:
+            history_msgs = json.loads(raw)
+            if history_msgs and history_msgs[-1]["role"] == "user":
+                history_msgs.pop()
+                await r.set(key, json.dumps(history_msgs), ex=7200)
+    else:
+        await _save_message(session_id, "assistant", full_response)

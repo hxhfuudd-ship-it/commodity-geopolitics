@@ -64,11 +64,12 @@ export const analysisApi = {
 export const aiApi = {
   newSession: () => request<{ session_id: string }>('/ai/chat/new', { method: 'POST' }),
   getHistory: (sessionId: string) => request<ChatSession>(`/ai/chat/${sessionId}/history`),
-  chat: (sessionId: string, message: string) =>
+  chat: (sessionId: string, message: string, signal?: AbortSignal) =>
     fetch(`${API_BASE}/ai/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId, message }),
+      signal,
     }),
 }
 

@@ -124,7 +124,15 @@ export default function MarketDetail() {
     const option: EChartsOption = {
       animation: false,
       tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-      legend: { data: ['K线', 'MA5', 'MA20', 'MA60', '成交量'], top: 0, textStyle: { fontSize: 11 } },
+      legend: {
+        data: [
+          { name: 'MA5', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
+          { name: 'MA20', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
+          { name: 'MA60', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
+        ],
+        top: 0,
+        textStyle: { fontSize: 11 },
+      },
       grid: [
         { left: '8%', right: '4%', top: '10%', height: '55%' },
         { left: '8%', right: '4%', top: '70%', height: '18%' },
@@ -202,10 +210,10 @@ export default function MarketDetail() {
             <span className="text-sm text-gray-400 ml-auto">{priceInfo?.trade_date}</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-            <InfoItem label="开盘" value={priceInfo.open?.toFixed(2)} />
-            <InfoItem label="最高" value={priceInfo.high?.toFixed(2)} />
-            <InfoItem label="最低" value={priceInfo.low?.toFixed(2)} />
-            <InfoItem label="成交量" value={priceInfo.volume?.toLocaleString()} />
+            <InfoItem label="开盘" value={priceInfo?.open?.toFixed(2)} />
+            <InfoItem label="最高" value={priceInfo?.high?.toFixed(2)} />
+            <InfoItem label="最低" value={priceInfo?.low?.toFixed(2)} />
+            <InfoItem label="成交量" value={priceInfo?.volume?.toLocaleString()} />
           </div>
         </div>
       )}

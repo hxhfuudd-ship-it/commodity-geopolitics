@@ -196,27 +196,10 @@ export default function Timeline() {
       series: [
         {
           name, type: 'line', data: prices,
-          smooth: false, symbol: 'none', z: 1,
+          smooth: 0.15, symbol: 'none', z: 1,
           sampling: 'lttb',
-          lineStyle: {
-            width: 1.8,
-            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-              { offset: 0, color: '#0d9488' },
-              { offset: 0.3, color: '#6d28d9' },
-              { offset: 0.65, color: '#be185d' },
-              { offset: 1, color: '#dc2626' },
-            ]),
-            shadowColor: 'rgba(109,40,217,0.12)',
-            shadowBlur: 6,
-            shadowOffsetY: 2,
-          },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(109,40,217,0.06)' },
-              { offset: 0.5, color: 'rgba(190,24,93,0.02)' },
-              { offset: 1, color: 'rgba(220,38,38,0)' },
-            ]),
-          },
+          lineStyle: { width: 1.8, color: '#3b82f6' },
+          itemStyle: { color: '#3b82f6' },
         },
         {
           name: '事件', type: 'scatter',

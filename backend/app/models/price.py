@@ -12,6 +12,7 @@ class PriceDaily(Base):
     high = Column(Numeric(16, 4))
     low = Column(Numeric(16, 4))
     close = Column(Numeric(16, 4))
+    settle = Column(Numeric(16, 4), nullable=True)
     volume = Column(BigInteger)
     open_interest = Column(BigInteger, nullable=True)
     change_pct = Column(Numeric(8, 4))

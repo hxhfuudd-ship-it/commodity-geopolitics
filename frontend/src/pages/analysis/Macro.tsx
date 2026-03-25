@@ -103,13 +103,14 @@ export default function Macro() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" /></div>
-      ) : (
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div ref={chartRef} style={{ width: '100%', height: 500 }} />
-        </div>
-      )}
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 relative">
+        <div ref={chartRef} style={{ width: '100%', height: 500 }} />
+        {loading && (
+          <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 flex items-center justify-center rounded-lg">
+            <div className="h-5 w-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

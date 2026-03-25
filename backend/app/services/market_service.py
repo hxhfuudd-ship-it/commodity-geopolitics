@@ -10,7 +10,6 @@ from app.models.price import PriceDaily
 from app.models.analysis import CftcPosition
 from app.schemas.market import CommodityOut, PriceDailyOut, MarketOverviewItem
 from app.core.cache import cache_get, cache_set
-from app.data_sources.akshare_client import fetch_realtime_price
 
 INIT_COMMODITIES = [
     # 金属
@@ -21,10 +20,9 @@ INIT_COMMODITIES = [
     {"symbol": "NI", "name_cn": "镍", "category": "metal", "exchange": "SHFE", "unit": "元/吨", "akshare_symbol": "NI0"},
     {"symbol": "FE", "name_cn": "铁矿石", "category": "metal", "exchange": "DCE", "unit": "元/吨", "akshare_symbol": "I0"},
     # 能源
-    {"symbol": "WTI", "name_cn": "WTI原油", "category": "energy", "exchange": "NYMEX", "unit": "美元/桶", "akshare_symbol": "CL"},
-    {"symbol": "BRENT", "name_cn": "布伦特原油", "category": "energy", "exchange": "INE", "unit": "元/桶", "akshare_symbol": "SC0"},
-    {"symbol": "NG", "name_cn": "天然气", "category": "energy", "exchange": "NYMEX", "unit": "美元/百万英热", "akshare_symbol": "NG"},
-    {"symbol": "COAL", "name_cn": "煤炭", "category": "energy", "exchange": "ZCE", "unit": "元/吨", "akshare_symbol": "ZC0"},
+    {"symbol": "SC", "name_cn": "上海原油", "category": "energy", "exchange": "INE", "unit": "元/桶", "akshare_symbol": "SC0"},
+    {"symbol": "FU", "name_cn": "燃料油", "category": "energy", "exchange": "SHFE", "unit": "元/吨", "akshare_symbol": "FU0"},
+    {"symbol": "PG", "name_cn": "LPG液化气", "category": "energy", "exchange": "DCE", "unit": "元/吨", "akshare_symbol": "PG0"},
     # 农产品
     {"symbol": "A", "name_cn": "大豆", "category": "agriculture", "exchange": "DCE", "unit": "元/吨", "akshare_symbol": "A0"},
     {"symbol": "M", "name_cn": "豆粕", "category": "agriculture", "exchange": "DCE", "unit": "元/吨", "akshare_symbol": "M0"},
@@ -141,6 +139,8 @@ async def get_compare_data(db: AsyncSession, symbols: list[str], normalize: bool
 
 
 async def get_overview(db: AsyncSession) -> list[MarketOverviewItem]:
+    """Get market overview. Uses DB data directly (no akshare calls) to avoid blocking.
+    Realtime prices are handled by the background task and cached separately."""
     cache_key = "market:overview"
     cached = await cache_get(cache_key)
     if cached:
@@ -149,37 +149,28 @@ async def get_overview(db: AsyncSession) -> list[MarketOverviewItem]:
     commodities = await db.execute(select(Commodity))
     items = []
     for c in commodities.scalars().all():
-        # Try realtime price first
-        realtime = await fetch_realtime_price(c.akshare_symbol)
-        if realtime and realtime.get("price"):
-            item = MarketOverviewItem(
-                symbol=c.symbol,
-                name_cn=c.name_cn,
-                category=c.category,
-                latest_price=realtime["price"],
-                change_pct=realtime.get("change_pct"),
-                updated_at=datetime.fromisoformat(realtime["updated_at"]) if realtime.get("updated_at") else datetime.now(),
-            )
-        else:
-            # Fallback to latest daily close
-            price_result = await db.execute(
-                select(PriceDaily)
-                .where(PriceDaily.commodity_id == c.id)
-                .order_by(PriceDaily.trade_date.desc())
-                .limit(1)
-            )
-            price = price_result.scalar_one_or_none()
-            item = MarketOverviewItem(
-                symbol=c.symbol,
-                name_cn=c.name_cn,
-                category=c.category,
-                latest_price=price.close if price else None,
-                change_pct=price.change_pct if price else None,
-                updated_at=datetime.combine(price.trade_date, datetime.min.time()) if price else None,
-            )
+        # Use latest daily close from DB (fast, no external calls)
+        price_result = await db.execute(
+            select(PriceDaily)
+            .where(PriceDaily.commodity_id == c.id)
+            .order_by(PriceDaily.trade_date.desc())
+            .limit(1)
+        )
+        price = price_result.scalar_one_or_none()
+        item = MarketOverviewItem(
+            symbol=c.symbol,
+            name_cn=c.name_cn,
+            category=c.category,
+            latest_price=price.close if price else None,
+            change_pct=price.change_pct if price else None,
+            open=price.open if price else None,
+            volume=price.volume if price else None,
+            open_interest=price.open_interest if price else None,
+            updated_at=datetime.combine(price.trade_date, datetime.min.time()) if price else None,
+        )
         items.append(item)
 
-    await cache_set(cache_key, [item.model_dump() for item in items], ttl=15)
+    await cache_set(cache_key, [item.model_dump() for item in items], ttl=60)
     return items
 
 

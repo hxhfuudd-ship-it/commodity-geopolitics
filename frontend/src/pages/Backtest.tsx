@@ -86,7 +86,9 @@ export default function Backtest() {
       type: 'line' as const,
       data: d.prices,
       smooth: 0.15,
-      lineStyle: { width: 2, color: COLORS[idx % COLORS.length] },
+      color: COLORS[idx % COLORS.length],
+      lineStyle: { width: 2 },
+      itemStyle: { color: COLORS[idx % COLORS.length] },
       symbol: 'none' as const,
     }))
 

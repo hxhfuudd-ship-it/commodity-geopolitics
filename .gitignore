@@ -36,6 +36,13 @@ backend/.env
 
 # Docker
 *.log
+docker-compose.prod.yml
+db_backup.dump
+deploy.sh
+
+# OpenClaw
+skills/
+.clawhub/
 
 # Alembic
 backend/alembic/versions/*.py

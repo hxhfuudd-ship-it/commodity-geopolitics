@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 import json
 
@@ -9,11 +9,15 @@ router = APIRouter(prefix="/ai", tags=["AI助手"])
 
 
 @router.post("/chat")
-async def chat(req: ChatRequest):
+async def chat(req: ChatRequest, request: Request):
     session_id = req.session_id or await ai_service.create_session()
 
     async def event_stream():
-        async for chunk in ai_service.chat(session_id, req.message):
+        async for chunk in ai_service.chat(
+            session_id, req.message, disconnect_check=request.is_disconnected
+        ):
+            if await request.is_disconnected():
+                break
             yield f"data: {json.dumps(chunk)}\n\n"
         yield "data: [DONE]\n\n"
 

@@ -73,13 +73,14 @@ export default function Correlation() {
         </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" /></div>
-      ) : (
-        <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
-          <div ref={chartRef} style={{ width: '100%', height: 500 }} />
-        </div>
-      )}
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 relative">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-gray-900/60 rounded-lg z-10 transition-opacity">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+          </div>
+        )}
+        <div ref={chartRef} style={{ width: '100%', height: 500, opacity: loading ? 0.4 : 1, transition: 'opacity 0.3s ease' }} />
+      </div>
     </div>
   )
 }

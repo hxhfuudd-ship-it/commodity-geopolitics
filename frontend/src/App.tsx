@@ -1,6 +1,26 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import MainLayout from './layouts/MainLayout'
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null }
+  static getDerivedStateFromError(error: Error) { return { error } }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.error('Page error:', error, info) }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <p className="text-red-500 text-sm">页面加载出错</p>
+          <button
+            onClick={() => { this.setState({ error: null }); window.location.reload() }}
+            className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md"
+          >刷新重试</button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const MarketList = lazy(() => import('./pages/market/MarketList'))
@@ -27,8 +47,9 @@ function Loading() {
 export default function App() {
   return (
     <MainLayout>
-      <Suspense fallback={<Loading />}>
-        <Routes>
+      <ErrorBoundary>
+        <Suspense fallback={<Loading />}>
+          <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/market" element={<MarketList />} />
           <Route path="/market/:symbol" element={<MarketDetail />} />
@@ -44,7 +65,8 @@ export default function App() {
           <Route path="/ai" element={<AiChat />} />
           <Route path="/backtest" element={<Backtest />} />
         </Routes>
-      </Suspense>
+        </Suspense>
+      </ErrorBoundary>
     </MainLayout>
   )
 }
