@@ -27,19 +27,25 @@ async def overview(db: AsyncSession = Depends(get_db)) -> list[MarketOverviewIte
 async def overview_stream():
     """SSE endpoint: push realtime prices every 3 seconds"""
     async def event_generator():
-        while True:
-            try:
-                data = await cache_get("market:overview:realtime")
-                if data:
-                    yield f"data: {json.dumps(data, default=str, ensure_ascii=False)}\n\n"
-            except Exception:
-                pass
-            await asyncio.sleep(3)
+        try:
+            while True:
+                try:
+                    data = await cache_get("market:overview:realtime")
+                    if data:
+                        yield f"data: {json.dumps(data, default=str, ensure_ascii=False)}\n\n"
+                    else:
+                        # Heartbeat to keep connection alive
+                        yield ": heartbeat\n\n"
+                except Exception:
+                    yield ": heartbeat\n\n"
+                await asyncio.sleep(3)
+        except asyncio.CancelledError:
+            pass
 
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no", "X-Content-Type-Options": "nosniff"},
     )
 
 

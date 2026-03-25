@@ -94,30 +94,103 @@ async def _fetch_one(cfg: dict) -> dict:
     }
 
 
+async def _fetch_all_from_db() -> list[dict]:
+    """Fast path: load all latest prices from DB without hitting akshare"""
+    items = []
+    try:
+        async with async_session() as db:
+            for cfg in _commodity_configs:
+                try:
+                    c = (await db.execute(
+                        select(Commodity).where(Commodity.symbol == cfg["symbol"])
+                    )).scalar_one_or_none()
+                    if c:
+                        p = (await db.execute(
+                            select(PriceDaily).where(PriceDaily.commodity_id == c.id)
+                            .order_by(PriceDaily.trade_date.desc()).limit(1)
+                        )).scalar_one_or_none()
+                        if p:
+                            items.append({
+                                "symbol": cfg["symbol"],
+                                "name_cn": cfg["name_cn"],
+                                "category": cfg["category"],
+                                "latest_price": float(p.close) if p.close else None,
+                                "change_pct": float(p.change_pct) if p.change_pct else None,
+                                "open": float(p.open) if p.open else None,
+                                "settle": None,
+                                "prev_close": None,
+                                "volume": int(p.volume) if p.volume else None,
+                                "open_interest": int(p.open_interest) if p.open_interest else None,
+                                "updated_at": str(p.trade_date),
+                            })
+                            continue
+                except Exception:
+                    pass
+                items.append({
+                    "symbol": cfg["symbol"], "name_cn": cfg["name_cn"],
+                    "category": cfg["category"], "latest_price": None,
+                    "change_pct": None, "open": None, "settle": None,
+                    "prev_close": None, "volume": None, "open_interest": None,
+                    "updated_at": None,
+                })
+    except Exception as e:
+        logger.warning(f"DB批量加载失败: {e}")
+    return items
+
+
 async def _refresh_loop():
-    """Background loop: fetch all realtime prices sequentially every 5 seconds.
-    Sequential to avoid mini_racer (V8) thread-safety crash."""
+    """Background loop: fetch all realtime prices sequentially.
+    Sequential to avoid mini_racer (V8) thread-safety crash.
+    Backs off to 60s when all akshare fetches fail (non-trading hours)."""
     await _load_commodity_configs()
     logger.info(f"实时行情后台任务启动，共 {len(_commodity_configs)} 个品种（顺序获取）")
+
+    # First cycle: load from DB immediately so API has data right away
+    db_items = await _fetch_all_from_db()
+    if db_items:
+        await cache_set("market:overview:realtime", db_items, ttl=120)
+        logger.info(f"已从数据库加载 {len(db_items)} 个品种的历史价格到缓存")
+
+    consecutive_failures = 0
 
     while True:
         try:
             items = []
+            realtime_success = 0
             for cfg in _commodity_configs:
                 try:
-                    result = await _fetch_one(cfg)
+                    # Add timeout to prevent blocking too long
+                    result = await asyncio.wait_for(_fetch_one(cfg), timeout=8)
                     if isinstance(result, dict):
                         items.append(result)
+                        if result.get("updated_at") and "T" in str(result.get("updated_at", "")):
+                            realtime_success += 1
+                except asyncio.TimeoutError:
+                    logger.debug(f"获取超时 {cfg['symbol']}")
                 except Exception as e:
                     logger.debug(f"单品种获取异常 {cfg['symbol']}: {e}")
 
             if items:
-                await cache_set("market:overview:realtime", items, ttl=30)
+                await cache_set("market:overview:realtime", items, ttl=120)
+
+            # Back off if no realtime data (non-trading hours)
+            if realtime_success == 0:
+                consecutive_failures += 1
+            else:
+                consecutive_failures = 0
 
         except Exception as e:
             logger.warning(f"实时行情刷新异常: {e}")
+            consecutive_failures += 1
 
-        await asyncio.sleep(5)
+        # Exponential backoff: 5s -> 30s -> 60s
+        if consecutive_failures >= 3:
+            sleep_time = 60
+        elif consecutive_failures >= 1:
+            sleep_time = 30
+        else:
+            sleep_time = 5
+        await asyncio.sleep(sleep_time)
 
 
 def start_realtime_task():
