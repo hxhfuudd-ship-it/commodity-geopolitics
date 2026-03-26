@@ -369,6 +369,15 @@ async def _refresh_loop():
         await asyncio.sleep(sleep_time)
 
 
+async def prefill_cache():
+    """启动时预热缓存，确保用户打开页面立即有数据"""
+    await _load_commodity_configs()
+    db_items = await _fetch_all_from_db()
+    if db_items:
+        await cache_set("market:overview:realtime", db_items, ttl=7200)
+        logger.info(f"预热缓存完成: {len(db_items)} 个品种")
+
+
 def start_realtime_task():
     """Start the background realtime refresh task"""
     global _task

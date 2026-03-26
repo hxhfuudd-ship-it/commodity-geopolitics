@@ -11,7 +11,7 @@ from app.models import Base
 from app.services.market_service import init_commodities
 from app.database import async_session
 from app.tasks.scheduler import init_scheduler, shutdown_scheduler
-from app.tasks.realtime_task import start_realtime_task, stop_realtime_task
+from app.tasks.realtime_task import start_realtime_task, stop_realtime_task, prefill_cache
 
 
 @asynccontextmanager
@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
         await init_commodities(db)
 
     init_scheduler()
+    await prefill_cache()
     start_realtime_task()
     logger.info("应用启动完成")
 
