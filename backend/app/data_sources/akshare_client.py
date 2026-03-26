@@ -78,6 +78,72 @@ _EASTMONEY_NAME_MAP = {
     "FU0": "燃油", "PG0": "液化石油气",
 }
 
+# push2 API: akshare_symbol -> 东方财富 secid (市场ID.主连代码)
+_PUSH2_SECID_MAP = {
+    "AU0": "113.aum", "AG0": "113.agm", "CU0": "113.cum", "AL0": "113.alm",
+    "NI0": "113.nim", "RU0": "113.rum", "FU0": "113.fum",
+    "I0": "114.im", "A0": "114.am", "M0": "114.mm", "Y0": "114.ym",
+    "P0": "114.pm", "C0": "114.cm", "PP0": "114.ppm", "PG0": "114.pgm",
+    "CF0": "115.CFM", "SR0": "115.SRM", "TA0": "115.TAM", "MA0": "115.MAM",
+    "SC0": "142.scm",
+}
+# 反向映射: secid中的代码部分 -> akshare_symbol
+_PUSH2_CODE_TO_AK = {secid.split(".")[1].lower(): ak_sym for ak_sym, secid in _PUSH2_SECID_MAP.items()}
+
+
+async def fetch_realtime_all_push2() -> dict[str, dict]:
+    """通过东方财富 push2 API 一次请求批量获取所有品种实时行情
+    返回 {akshare_symbol: {price, change_pct, open, volume, ...}}"""
+    import requests as _requests
+
+    secids = ",".join(_PUSH2_SECID_MAP.values())
+    url = "https://push2.eastmoney.com/api/qt/ulist.np/get"
+    params = {
+        "fltt": 2, "invt": 2,
+        "secids": secids,
+        "fields": "f2,f3,f4,f5,f6,f12,f13,f14,f15,f16,f17,f18",
+    }
+
+    def _fetch():
+        try:
+            resp = _requests.get(url, params=params, timeout=10)
+            data = resp.json()
+            diff = data.get("data", {}).get("diff", [])
+            if not diff:
+                return {}
+
+            result = {}
+            for it in diff:
+                code = str(it.get("f12", "")).lower()
+                ak_sym = _PUSH2_CODE_TO_AK.get(code)
+                if not ak_sym:
+                    continue
+                price = it.get("f2")
+                if price is None or price == "-":
+                    continue
+                price = float(price)
+                if price <= 0:
+                    continue
+                result[ak_sym] = {
+                    "price": price,
+                    "change_pct": round(float(it.get("f3", 0)), 4),
+                    "open": float(it.get("f17", 0)),
+                    "volume": int(float(it.get("f5", 0))),
+                    "settle": 0,  # push2 不返回结算价，由 realtime_task 回退补充
+                    "open_interest": 0,
+                    "prev_close": float(it.get("f18", 0)),
+                    "high": float(it.get("f15", 0)),
+                    "low": float(it.get("f16", 0)),
+                    "updated_at": datetime.now().isoformat(),
+                }
+            logger.info(f"push2 批量获取成功: {len(result)}/{len(_PUSH2_SECID_MAP)} 个品种")
+            return result
+        except Exception as e:
+            logger.debug(f"push2 批量获取失败: {e}")
+            return {}
+
+    return await _run_sync(_fetch)
+
 
 async def fetch_realtime_price(akshare_symbol: str) -> dict:
     """获取期货实时价格，内盘优先东方财富接口，失败回退新浪；外盘用 yfinance"""
