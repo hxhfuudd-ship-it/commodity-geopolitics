@@ -134,8 +134,9 @@ export default function Timeline() {
         },
         labelLine: {
           show: true,
-          lineStyle: { color: 'rgba(148,163,184,0.5)', width: 1, type: 'dashed' as const },
-          length2: Math.abs(pt.labelOff[1]) * 0.55,
+          showAbove: true,
+          lineStyle: { color: 'rgba(148,163,184,0.45)', width: 1, type: 'dashed' as const },
+          length2: Math.abs(pt.labelOff[1]) * 0.6,
         },
         _event: pt.event,
       }
@@ -211,6 +212,7 @@ export default function Timeline() {
         {
           name: '事件', type: 'scatter',
           data: dotData, z: 10,
+          labelLayout: { hideOverlap: false },
         },
       ],
     }

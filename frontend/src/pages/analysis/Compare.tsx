@@ -16,10 +16,14 @@ export default function Compare() {
 
   useEffect(() => {
     if (selected.length < 2) return
+    if (chartRef.current) chartRef.current.showLoading({ text: '加载中...', maskColor: 'rgba(255,255,255,0.7)' })
     marketApi.getCompare(selected, normalize)
       .then(setData)
       .catch(console.error)
-      .finally(() => setFirstLoad(false))
+      .finally(() => {
+        setFirstLoad(false)
+        if (chartRef.current) chartRef.current.hideLoading()
+      })
   }, [selected, normalize])
 
   const toggle = (symbol: string) => {
@@ -45,14 +49,22 @@ export default function Compare() {
         data: dates.map(d => priceMap.get(d) ?? null),
         smooth: true,
         symbol: 'none' as const,
+        sampling: 'lttb' as const,
         lineStyle: { width: 2, color: COLORS[idx % COLORS.length] },
+        itemStyle: { color: COLORS[idx % COLORS.length] },
         connectNulls: true,
       }
     })
 
     return {
       tooltip: { trigger: 'axis' },
-      legend: { top: 0, data: series.map(s => s.name) },
+      legend: {
+        top: 0,
+        data: series.map(s => s.name),
+        icon: 'roundRect',
+        itemWidth: 18,
+        itemHeight: 3,
+      },
       grid: { left: '6%', right: '4%', top: '12%', bottom: '15%' },
       xAxis: { type: 'category', data: dates },
       yAxis: { type: 'value', scale: true, name: normalize ? '归一化 (%)' : '价格' },

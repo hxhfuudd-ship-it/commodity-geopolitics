@@ -18,7 +18,7 @@ from app.services.news_service import get_articles
 from app.schemas.news import NewsListQuery
 
 
-PERIOD_MAP = {"30d": 30, "90d": 90, "180d": 180, "1y": 365}
+PERIOD_MAP = {"30d": 30, "90d": 90, "180d": 180, "1y": 365, "3y": 1095, "5y": 1825}
 
 
 async def get_correlation(db: AsyncSession, symbols: list[str], period: str = "90d") -> CorrelationMatrixOut:

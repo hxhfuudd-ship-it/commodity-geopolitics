@@ -48,4 +48,6 @@ export const PERIODS = [
   { value: '90d', label: '90天' },
   { value: '180d', label: '半年' },
   { value: '1y', label: '一年' },
+  { value: '3y', label: '三年' },
+  { value: '5y', label: '五年' },
 ] as const
