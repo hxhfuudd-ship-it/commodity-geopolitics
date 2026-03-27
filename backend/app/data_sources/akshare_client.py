@@ -148,11 +148,6 @@ async def fetch_realtime_all_push2() -> dict[str, dict]:
 async def fetch_realtime_price(akshare_symbol: str) -> dict:
     """获取期货实时价格，内盘优先东方财富接口，失败回退新浪；外盘用 yfinance"""
     try:
-        # 外盘品种用 yfinance
-        _yfinance_map = {"CL": "CL=F", "NG": "NG=F", "BZ_F": "BZ=F"}
-        if akshare_symbol in _yfinance_map:
-            return await _fetch_yfinance_realtime(_yfinance_map[akshare_symbol])
-
         # ZC0 动力煤已退市，跳过实时（走 fallback）
         if akshare_symbol == "ZC0":
             return {}

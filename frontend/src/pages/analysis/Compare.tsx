@@ -7,7 +7,7 @@ import type { EChartsOption } from 'echarts'
 const COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
 
 export default function Compare() {
-  const [selected, setSelected] = useState<string[]>(['AU', 'CU', 'WTI'])
+  const [selected, setSelected] = useState<string[]>(['AU', 'CU', 'SC'])
   const [data, setData] = useState<Record<string, { dates: string[]; prices: number[] }> | null>(null)
   const [firstLoad, setFirstLoad] = useState(true)
   const [normalize, setNormalize] = useState(true)
