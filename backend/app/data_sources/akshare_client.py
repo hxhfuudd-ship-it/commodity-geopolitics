@@ -255,20 +255,26 @@ async def fetch_macro_indicator(indicator_code: str) -> pd.DataFrame:
         import akshare as ak
 
         def _fetch_dxy():
-            """美元指数 (ICE DXY) — Yahoo Finance"""
+            """美元指数 (ICE DXY) — Yahoo Finance, 带重试"""
             import yfinance as yf
-            df = yf.download('DX-Y.NYB', start='2008-01-01', progress=False)
-            if df is None or df.empty:
-                return pd.DataFrame()
-            df = df.reset_index()
-            # yfinance returns MultiIndex columns, flatten
-            if hasattr(df.columns, 'levels'):
-                df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
-            df = df.rename(columns={"Date": "date", "Close": "value"})
-            df = df[["date", "value"]].dropna(subset=["value"])
-            df["date"] = pd.to_datetime(df["date"]).dt.date
-            df["value"] = pd.to_numeric(df["value"], errors="coerce")
-            return df.dropna().sort_values("date").reset_index(drop=True)
+            import time
+            for attempt in range(3):
+                try:
+                    df = yf.download('DX-Y.NYB', start='2008-01-01', progress=False)
+                    if df is not None and not df.empty:
+                        df = df.reset_index()
+                        if hasattr(df.columns, 'levels'):
+                            df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+                        df = df.rename(columns={"Date": "date", "Close": "value"})
+                        df = df[["date", "value"]].dropna(subset=["value"])
+                        df["date"] = pd.to_datetime(df["date"]).dt.date
+                        df["value"] = pd.to_numeric(df["value"], errors="coerce")
+                        return df.dropna().sort_values("date").reset_index(drop=True)
+                except Exception as e:
+                    logger.debug(f"DXY yfinance attempt {attempt+1} failed: {e}")
+                    if attempt < 2:
+                        time.sleep(10)
+            return pd.DataFrame()
 
         def _fetch_usdcny():
             """人民币汇率 USD/CNY — 央行中间价"""
@@ -304,19 +310,40 @@ async def fetch_macro_indicator(indicator_code: str) -> pd.DataFrame:
             return df.dropna().sort_values("date").reset_index(drop=True)
 
         def _fetch_fed_rate():
-            """美联储利率 — 13周美国国债收益率 (^IRX)，日度"""
+            """美联储利率 — 优先 akshare，备用 yfinance"""
+            # 优先用 akshare (不会被限流)
+            try:
+                df = ak.macro_bank_usa_interest_rate()
+                if df is not None and not df.empty:
+                    df = df.rename(columns={"日期": "date", "今值": "value"})
+                    df = df[["date", "value"]].dropna(subset=["value"])
+                    df["date"] = pd.to_datetime(df["date"]).dt.date
+                    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+                    result = df.dropna().sort_values("date").reset_index(drop=True)
+                    if not result.empty:
+                        return result
+            except Exception as e:
+                logger.debug(f"akshare 美联储利率获取失败: {e}")
+            # 备用 yfinance
             import yfinance as yf
-            df = yf.download('^IRX', start='2008-01-01', progress=False)
-            if df is None or df.empty:
-                return pd.DataFrame()
-            df = df.reset_index()
-            if hasattr(df.columns, 'levels'):
-                df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
-            df = df.rename(columns={"Date": "date", "Close": "value"})
-            df = df[["date", "value"]].dropna(subset=["value"])
-            df["date"] = pd.to_datetime(df["date"]).dt.date
-            df["value"] = pd.to_numeric(df["value"], errors="coerce")
-            return df.dropna().sort_values("date").reset_index(drop=True)
+            import time
+            for attempt in range(3):
+                try:
+                    df = yf.download('^IRX', start='2008-01-01', progress=False)
+                    if df is not None and not df.empty:
+                        df = df.reset_index()
+                        if hasattr(df.columns, 'levels'):
+                            df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+                        df = df.rename(columns={"Date": "date", "Close": "value"})
+                        df = df[["date", "value"]].dropna(subset=["value"])
+                        df["date"] = pd.to_datetime(df["date"]).dt.date
+                        df["value"] = pd.to_numeric(df["value"], errors="coerce")
+                        return df.dropna().sort_values("date").reset_index(drop=True)
+                except Exception as e:
+                    logger.debug(f"FED_RATE yfinance attempt {attempt+1} failed: {e}")
+                    if attempt < 2:
+                        time.sleep(10)
+            return pd.DataFrame()
 
         def _fetch_bdi():
             """波罗的海干散货指数 — 通过 akshare 获取"""
