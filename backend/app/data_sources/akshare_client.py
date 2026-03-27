@@ -321,7 +321,7 @@ async def fetch_macro_indicator(indicator_code: str) -> pd.DataFrame:
         def _fetch_bdi():
             """波罗的海干散货指数 — 通过 akshare 获取"""
             try:
-                df = ak.index_baltic_dry_index()
+                df = ak.macro_shipping_bdi()
                 if df is None or df.empty:
                     return pd.DataFrame()
                 # akshare 返回列名可能是中文
