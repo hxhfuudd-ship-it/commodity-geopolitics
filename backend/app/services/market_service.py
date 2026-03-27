@@ -104,6 +104,13 @@ async def get_kline(
     db: AsyncSession, symbol: str, period: str = "day",
     start_date: Optional[date] = None, end_date: Optional[date] = None
 ) -> list[PriceDailyOut]:
+    # Redis 缓存 (仅无 start_date/end_date 时使用)
+    cache_key = f"market:kline:{symbol}:{period}"
+    if not start_date and not end_date:
+        cached = await cache_get(cache_key)
+        if cached:
+            return [PriceDailyOut(**item) for item in cached]
+
     result = await db.execute(
         select(Commodity).where(Commodity.symbol == symbol)
     )
@@ -120,7 +127,13 @@ async def get_kline(
 
     result = await db.execute(query)
     rows = result.scalars().all()
-    return [PriceDailyOut.model_validate(r) for r in rows]
+    items = [PriceDailyOut.model_validate(r) for r in rows]
+
+    # 写缓存 (TTL 60s)
+    if not start_date and not end_date and items:
+        await cache_set(cache_key, [item.model_dump(mode="json") for item in items], ttl=60)
+
+    return items
 
 
 async def get_compare_data(db: AsyncSession, symbols: list[str], normalize: bool = True) -> dict:

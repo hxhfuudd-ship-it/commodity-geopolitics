@@ -319,8 +319,33 @@ async def fetch_macro_indicator(indicator_code: str) -> pd.DataFrame:
             return df.dropna().sort_values("date").reset_index(drop=True)
 
         def _fetch_bdi():
-            """波罗的海干散货指数 — 已有数据，增量更新"""
-            return pd.DataFrame()
+            """波罗的海干散货指数 — 通过 akshare 获取"""
+            try:
+                df = ak.index_baltic_dry_index()
+                if df is None or df.empty:
+                    return pd.DataFrame()
+                # akshare 返回列名可能是中文
+                col_map = {}
+                for col in df.columns:
+                    cl = str(col).lower()
+                    if "日期" in cl or "date" in cl:
+                        col_map[col] = "date"
+                    elif "指数" in cl or "value" in cl or "bdi" in cl:
+                        col_map[col] = "value"
+                if col_map:
+                    df = df.rename(columns=col_map)
+                if "date" not in df.columns or "value" not in df.columns:
+                    # 尝试用前两列
+                    cols = df.columns.tolist()
+                    if len(cols) >= 2:
+                        df = df.rename(columns={cols[0]: "date", cols[1]: "value"})
+                df = df[["date", "value"]].dropna(subset=["value"])
+                df["date"] = pd.to_datetime(df["date"]).dt.date
+                df["value"] = pd.to_numeric(df["value"], errors="coerce")
+                return df.dropna().sort_values("date").reset_index(drop=True)
+            except Exception as e:
+                logger.debug(f"BDI 获取失败: {e}")
+                return pd.DataFrame()
 
         indicator_map = {
             "DXY": _fetch_dxy,
