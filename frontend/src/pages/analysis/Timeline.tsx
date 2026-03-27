@@ -187,7 +187,7 @@ export default function Timeline() {
         {
           type: 'slider', start: zStart, end: 100, height: 22, bottom: 6,
           borderColor: 'transparent', backgroundColor: 'rgba(241,245,249,0.6)',
-          fillerColor: 'rgba(59,130,246,0.06)',
+          fillerColor: 'rgba(139,92,246,0.08)',
           handleStyle: { color: '#94a3b8', borderColor: '#94a3b8' },
           handleSize: '60%',
           textStyle: { fontSize: 10, color: '#94a3b8' },
@@ -198,8 +198,15 @@ export default function Timeline() {
           name, type: 'line', data: prices,
           smooth: 0.15, symbol: 'none', z: 1,
           sampling: 'lttb',
-          lineStyle: { width: 1.8, color: '#3b82f6' },
-          itemStyle: { color: '#3b82f6' },
+          lineStyle: {
+            width: 1.8,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: '#3b82f6' },
+              { offset: 0.5, color: '#8b5cf6' },
+              { offset: 1, color: '#ef4444' },
+            ]),
+          },
+          itemStyle: { color: '#ef4444' },
         },
         {
           name: '事件', type: 'scatter',
