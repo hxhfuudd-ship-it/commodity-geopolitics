@@ -9,7 +9,6 @@ const COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899'
 export default function Compare() {
   const [selected, setSelected] = useState<string[]>(['AU', 'CU', 'SC'])
   const [data, setData] = useState<Record<string, { dates: string[]; prices: number[] }> | null>(null)
-  const [firstLoad, setFirstLoad] = useState(true)
   const [normalize, setNormalize] = useState(true)
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<echarts.ECharts | null>(null)
@@ -21,7 +20,6 @@ export default function Compare() {
       .then(setData)
       .catch(console.error)
       .finally(() => {
-        setFirstLoad(false)
         if (chartRef.current) chartRef.current.hideLoading()
       })
   }, [selected, normalize])
@@ -78,8 +76,11 @@ export default function Compare() {
     if (!chartContainerRef.current) return
     if (!chartRef.current) {
       chartRef.current = echarts.init(chartContainerRef.current)
+      // Show loading on first init while data is being fetched
+      if (!option) chartRef.current.showLoading({ text: '加载中...', maskColor: 'rgba(255,255,255,0.7)' })
     }
     if (option) {
+      chartRef.current.hideLoading()
       chartRef.current.setOption(option, true)
     }
     const handleResize = () => chartRef.current?.resize()
@@ -125,8 +126,6 @@ export default function Compare() {
 
       {selected.length < 2 ? (
         <div className="text-center py-12 text-gray-400">请至少选择 2 个品种</div>
-      ) : firstLoad ? (
-        <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" /></div>
       ) : (
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4">
           <div ref={chartContainerRef} style={{ width: '100%', height: 500 }} />

@@ -39,7 +39,6 @@ export const MACRO_INDICATORS = [
   { code: 'USDCNY', name: '人民币汇率' },
   { code: 'US10Y', name: '美国10年期国债收益率' },
   { code: 'CN10Y', name: '中国10年期国债收益率' },
-  { code: 'FED_RATE', name: '美联储利率' },
   { code: 'BDI', name: '波罗的海干散货指数' },
 ] as const
 
