@@ -255,7 +255,21 @@ async def fetch_macro_indicator(indicator_code: str) -> pd.DataFrame:
         import akshare as ak
 
         def _fetch_dxy():
-            """美元指数 (ICE DXY) — Yahoo Finance, 带重试"""
+            """美元指数 (ICE DXY) — 优先东方财富，备用 Yahoo Finance"""
+            # 优先用 akshare 东方财富接口（不会被限流）
+            try:
+                df = ak.index_global_hist_em(symbol="美元指数")
+                if df is not None and not df.empty:
+                    df = df.rename(columns={"日期": "date", "最新价": "value"})
+                    df = df[["date", "value"]].dropna(subset=["value"])
+                    df["date"] = pd.to_datetime(df["date"]).dt.date
+                    df["value"] = pd.to_numeric(df["value"], errors="coerce")
+                    result = df.dropna().sort_values("date").reset_index(drop=True)
+                    if not result.empty:
+                        return result
+            except Exception as e:
+                logger.debug(f"DXY 东方财富获取失败: {e}")
+            # 备用 yfinance
             import yfinance as yf
             import time
             for attempt in range(3):

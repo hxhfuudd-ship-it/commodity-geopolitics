@@ -18,8 +18,8 @@ MACRO_CODES = {
     "FED_RATE": "美联储利率",
 }
 
-# 使用 yfinance 的指标，需要加延迟
-_YFINANCE_CODES = {"DXY", "FED_RATE"}
+# 使用 yfinance 的指标，需要加延迟（DXY 已改用东方财富，不再需要延迟）
+_YFINANCE_CODES = {"FED_RATE"}
 
 
 async def fetch_macro_data():
