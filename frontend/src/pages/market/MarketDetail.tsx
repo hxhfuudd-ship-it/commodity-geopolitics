@@ -110,13 +110,13 @@ export default function MarketDetail() {
     if (!chartInstance.current) {
       chartInstance.current = echarts.init(chartRef.current)
       chartInstance.current.on('datazoom', handleDataZoom)
-      const handleResize = () => chartInstance.current?.resize()
-      window.addEventListener('resize', handleResize)
     }
 
     if (!kline.length) {
       chartInstance.current.showLoading({ text: '加载中...', maskColor: 'rgba(255,255,255,0.7)' })
-      return
+      const handleResize = () => chartInstance.current?.resize()
+      window.addEventListener('resize', handleResize)
+      return () => window.removeEventListener('resize', handleResize)
     }
     chartInstance.current.hideLoading()
 
@@ -174,6 +174,10 @@ export default function MarketDetail() {
     }
 
     chartInstance.current.setOption(option, true)
+
+    const handleResize = () => chartInstance.current?.resize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [kline])
 
   useEffect(() => {

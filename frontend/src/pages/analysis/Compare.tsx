@@ -34,23 +34,36 @@ export default function Compare() {
 
   const option = useMemo<EChartsOption | null>(() => {
     if (!data) return null
-    const allDates = new Set<string>()
-    for (const v of Object.values(data)) v.dates.forEach(d => allDates.add(d))
-    const dates = Array.from(allDates).sort()
+    const validEntries = Object.entries(data).filter(([, v]) => v.dates.length > 0 && v.prices.length > 0)
+    if (!validEntries.length) return null
 
-    const series = Object.entries(data).map(([symbol, v], idx) => {
-      const priceMap = new Map(v.dates.map((d, i) => [d, v.prices[i]]))
+    // Find the latest first-date for smart zoom start
+    let latestStart = ''
+    let earliestStart = 'z'
+    for (const [, v] of validEntries) {
+      if (v.dates[0] > latestStart) latestStart = v.dates[0]
+      if (v.dates[0] < earliestStart) earliestStart = v.dates[0]
+    }
+    // Compute zoom start as percentage of total time range
+    const allLast = validEntries.reduce((max, [, v]) => {
+      const last = v.dates[v.dates.length - 1]
+      return last > max ? last : max
+    }, '')
+    const totalMs = new Date(allLast).getTime() - new Date(earliestStart).getTime()
+    const overlapMs = new Date(latestStart).getTime() - new Date(earliestStart).getTime()
+    const zoomStart = totalMs > 0 ? Math.max(0, ((overlapMs / totalMs) - 0.05) * 100) : 50
+
+    const series = validEntries.map(([symbol, v], idx) => {
       const name = COMMODITIES.find(c => c.symbol === symbol)?.name || symbol
       return {
         name,
         type: 'line' as const,
-        data: dates.map(d => priceMap.get(d) ?? null),
+        data: v.dates.map((d, i) => [d, v.prices[i]]),
         smooth: true,
         symbol: 'none' as const,
         sampling: 'lttb' as const,
         lineStyle: { width: 2, color: COLORS[idx % COLORS.length] },
         itemStyle: { color: COLORS[idx % COLORS.length] },
-        connectNulls: true,
       }
     })
 
@@ -64,9 +77,9 @@ export default function Compare() {
         itemHeight: 3,
       },
       grid: { left: '6%', right: '4%', top: '12%', bottom: '15%' },
-      xAxis: { type: 'category', data: dates },
+      xAxis: { type: 'time' },
       yAxis: { type: 'value', scale: true, name: normalize ? '归一化 (%)' : '价格' },
-      dataZoom: [{ type: 'inside', start: 50, end: 100 }, { type: 'slider', start: 50, end: 100 }],
+      dataZoom: [{ type: 'inside', start: zoomStart, end: 100 }, { type: 'slider', start: zoomStart, end: 100 }],
       series,
     }
   }, [data, normalize])
