@@ -29,14 +29,14 @@ function layoutEvents(
   const sorted = [...pts].sort((a, b) => a.dateIdx - b.dateIdx)
   const out: Laid[] = []
 
-  // Spread cards: alternate up/down, stagger horizontally
+  // Spread cards: alternate up/down, small offsets close to dots
   sorted.forEach((pt, i) => {
     const isUp = i % 2 === 0
     const tier = Math.floor(i / 2)
-    // Short vertical + moderate horizontal spread
-    const yOff = isUp ? -(22 + tier * 16) : (22 + tier * 16)
-    // Alternate left/right with moderate spread
-    const xOff = ((i % 4) < 2 ? -1 : 1) * (20 + (i % 3) * 15)
+    // Keep cards close to dots
+    const yOff = isUp ? -(20 + tier * 14) : (20 + tier * 14)
+    // Small horizontal nudge, alternate directions
+    const xOff = (i % 2 === 0 ? -1 : 1) * (8 + (tier % 3) * 6)
     out.push({
       ...pt,
       labelPos: isUp ? 'top' as const : 'bottom' as const,
