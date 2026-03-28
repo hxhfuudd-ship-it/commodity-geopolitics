@@ -33,10 +33,10 @@ function layoutEvents(
   sorted.forEach((pt, i) => {
     const isUp = i % 2 === 0
     const tier = Math.floor(i / 2)
-    // Keep cards close to dots
-    const yOff = isUp ? -(20 + tier * 14) : (20 + tier * 14)
-    // Small horizontal nudge, alternate directions
-    const xOff = (i % 2 === 0 ? -1 : 1) * (8 + (tier % 3) * 6)
+    // Keep cards very close to dots
+    const yOff = isUp ? -(6 + tier * 4) : (6 + tier * 4)
+    // Tiny horizontal nudge
+    const xOff = (i % 2 === 0 ? -1 : 1) * (3 + (tier % 3) * 2)
     out.push({
       ...pt,
       labelPos: isUp ? 'top' as const : 'bottom' as const,
