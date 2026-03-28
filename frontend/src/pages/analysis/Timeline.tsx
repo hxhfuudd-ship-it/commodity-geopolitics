@@ -28,33 +28,21 @@ function layoutEvents(
   if (!pts.length) return []
   const sorted = [...pts].sort((a, b) => a.dateIdx - b.dateIdx)
   const out: Laid[] = []
-  const threshold = Math.max(total * 0.025, 30)
 
-  const groups: typeof sorted[] = []
-  let cur = [sorted[0]]
-  for (let i = 1; i < sorted.length; i++) {
-    if (sorted[i].dateIdx - sorted[i - 1].dateIdx > threshold) {
-      groups.push(cur); cur = [sorted[i]]
-    } else { cur.push(sorted[i]) }
-  }
-  groups.push(cur)
-
-  for (const group of groups) {
-    const n = group.length
-    group.forEach((pt, gi) => {
-      const isUp = gi % 2 === 0
-      const tier = Math.floor(gi / 2)
-      const baseY = 42 + tier * 36
-      const yLabel = isUp ? -baseY : baseY
-      // Alternate horizontal offset for L-shape lines
-      const xOff = (gi % 4 < 2 ? -1 : 1) * (60 + tier * 20)
-      out.push({
-        ...pt,
-        labelPos: isUp ? 'top' as const : 'bottom' as const,
-        labelOff: [xOff, yLabel] as [number, number],
-      })
+  // Spread cards: alternate up/down, stagger horizontally
+  sorted.forEach((pt, i) => {
+    const isUp = i % 2 === 0
+    const tier = Math.floor(i / 2)
+    // Short vertical + moderate horizontal spread
+    const yOff = isUp ? -(28 + tier * 22) : (28 + tier * 22)
+    // Alternate left/right with increasing spread
+    const xOff = ((i % 4) < 2 ? -1 : 1) * (40 + (i % 3) * 25)
+    out.push({
+      ...pt,
+      labelPos: isUp ? 'top' as const : 'bottom' as const,
+      labelOff: [xOff, yOff] as [number, number],
     })
-  }
+  })
   return out
 }
 
@@ -225,7 +213,7 @@ export default function Timeline() {
     }
     if (option) chart.current.setOption(option, true)
 
-    // Compute SVG lines: vertical from dot, then angled to label
+    // Compute SVG lines: short vertical from dot, then angled to label
     const computeLines = () => {
       const c = chart.current
       const laid = laidRef.current
@@ -237,11 +225,13 @@ export default function Timeline() {
           if (p && !isNaN(p[0]) && !isNaN(p[1])) {
             const dotX = p[0]
             const dotY = p[1]
-            // Elbow point: vertically 70% of the way, then angle to label
-            const elbowY = dotY + pt.labelOff[1] * 0.7
+            // Short vertical segment (30%), then angle to label
+            const vertLen = pt.labelOff[1] * 0.3
+            const elbowX = dotX
+            const elbowY = dotY + vertLen
             const labelX = dotX + pt.labelOff[0]
             const labelY = dotY + pt.labelOff[1]
-            results.push({ x1: dotX, y1: dotY, x2: dotX, y2: elbowY, x3: labelX, y3: labelY })
+            results.push({ x1: dotX, y1: dotY, x2: elbowX, y2: elbowY, x3: labelX, y3: labelY })
           }
         } catch { /* chart not ready */ }
       }
