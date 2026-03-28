@@ -1,52 +1,49 @@
 services:
   postgres:
     image: postgres:15
-    container_name: commodity_postgres
+    container_name: geo_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: geo_postgres_2024
       POSTGRES_DB: commodity_geo
-    ports:
-      - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - geo_pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - commodity-net
+      - geo-net
 
   redis:
     image: redis:7-alpine
-    container_name: commodity_redis
+    container_name: geo_redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
-      - redisdata:/data
+      - geo_redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - commodity-net
+      - geo-net
 
   backend:
     build: ./backend
-    container_name: commodity_backend
+    container_name: geo_backend
     restart: unless-stopped
-    ports:
-      - "8000:8000"
-    env_file:
-      - ./backend/.env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/commodity_geo
+      DATABASE_URL: postgresql+asyncpg://postgres:geo_postgres_2024@postgres:5432/commodity_geo
       REDIS_URL: redis://redis:6379/0
+      DEEPSEEK_API_KEY: sk-cc683df4798e440b91aa111042d95e29
+      DEEPSEEK_BASE_URL: https://api.deepseek.com
+      DEEPSEEK_MODEL: deepseek-chat
+      AKSHARE_FETCH_INTERVAL: 300
+      NEWS_FETCH_INTERVAL: 900
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,13 +54,16 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 20s
     networks:
-      - commodity-net
+      - geo-net
 
   frontend:
-    build: ./frontend
-    container_name: commodity_frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: ""
+    container_name: geo_frontend
     restart: unless-stopped
     ports:
       - "9180:80"
@@ -71,12 +71,12 @@ services:
       backend:
         condition: service_healthy
     networks:
-      - commodity-net
+      - geo-net
 
 volumes:
-  pgdata:
-  redisdata:
+  geo_pgdata:
+  geo_redisdata:
 
 networks:
-  commodity-net:
+  geo-net:
     driver: bridge

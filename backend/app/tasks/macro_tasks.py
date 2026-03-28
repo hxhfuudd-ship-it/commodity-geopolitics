@@ -15,10 +15,11 @@ MACRO_CODES = {
     "CN10Y": "中国10年期国债收益率",
     "BDI": "波罗的海干散货指数",
     "DXY": "美元指数",
+    "FED_RATE": "美联储利率",
 }
 
-# 使用 yfinance 的指标，需要加延迟
-_YFINANCE_CODES: set[str] = set()
+# 使用 yfinance 的指标，需要加延迟（DXY 已改用东方财富，不再需要延迟）
+_YFINANCE_CODES = {"FED_RATE"}
 
 
 async def fetch_macro_data():
