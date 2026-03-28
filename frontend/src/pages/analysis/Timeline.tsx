@@ -46,11 +46,11 @@ function layoutEvents(
       const tier = Math.floor(gi / 2)
       const baseY = 38 + tier * 34
       const yLabel = isUp ? -baseY : baseY
-      const xSpread = n > 2 ? (gi - (n - 1) / 2) * 14 : 0
+      // Vertical lines — no horizontal spread
       out.push({
         ...pt,
         labelPos: isUp ? 'top' as const : 'bottom' as const,
-        labelOff: [xSpread, yLabel] as [number, number],
+        labelOff: [0, yLabel] as [number, number],
       })
     })
   }
@@ -63,8 +63,10 @@ export default function Timeline() {
   const [symbol, setSymbol] = useState('AU')
   const [initialLoading, setInitialLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<GeoEvent | null>(null)
+  const [svgLines, setSvgLines] = useState<{ x: number; y1: number; y2: number }[]>([])
   const chartRef = useRef<HTMLDivElement>(null)
   const chart = useRef<echarts.ECharts | null>(null)
+  const laidRef = useRef<Laid[]>([])
 
   useEffect(() => {
     newsApi.getEventsTimeline().then(setEvents).catch(console.error)
@@ -100,6 +102,7 @@ export default function Timeline() {
     }).filter(Boolean) as { dateIdx: number; date: string; price: number; event: GeoEvent }[]
 
     const laid = layoutEvents(raw, dates.length)
+    laidRef.current = laid
 
     const idxs = laid.map(p => p.dateIdx)
     let zStart = 0
@@ -107,12 +110,12 @@ export default function Timeline() {
       zStart = Math.max(0, ((Math.min(...idxs) - 60) / dates.length) * 100)
     }
 
-    // Small dots on curve + label cards with dashed leader lines
+    // Scatter dots with labels
     const dotData = laid.map(pt => {
       const col = SEV_COLOR[pt.event.severity] || '#64748b'
       return {
         value: [pt.date, pt.price],
-        symbolSize: 8,
+        symbolSize: 10,
         itemStyle: { color: '#fff', borderColor: col, borderWidth: 2, shadowBlur: 4, shadowColor: 'rgba(0,0,0,0.1)' },
         label: {
           show: true,
@@ -131,11 +134,6 @@ export default function Timeline() {
           shadowOffsetY: 2,
           shadowColor: 'rgba(0,0,0,0.05)',
           lineHeight: 14,
-        },
-        labelLine: {
-          show: true,
-          lineStyle: { color: 'rgba(148,163,184,0.5)', width: 1, type: 'dashed' as const },
-          length2: Math.abs(pt.labelOff[1]) * 0.55,
         },
         _event: pt.event,
       }
@@ -168,7 +166,7 @@ export default function Timeline() {
           return tip
         },
       },
-      grid: { left: '6%', right: '5%', top: '6%', bottom: '14%', containLabel: true },
+      grid: { left: '6%', right: '5%', top: '12%', bottom: '14%', containLabel: true },
       xAxis: {
         type: 'category', data: dates, boundaryGap: true,
         axisLine: { lineStyle: { color: '#e2e8f0' } },
@@ -196,10 +194,17 @@ export default function Timeline() {
       series: [
         {
           name, type: 'line', data: prices,
-          smooth: 0.15, symbol: 'none', z: 1,
+          smooth: false, symbol: 'none', z: 1,
           sampling: 'lttb',
-          lineStyle: { width: 1.8, color: '#3b82f6' },
-          itemStyle: { color: '#3b82f6' },
+          lineStyle: {
+            width: 2,
+            color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              { offset: 0, color: '#3b82f6' },
+              { offset: 0.5, color: '#8b5cf6' },
+              { offset: 1, color: '#ef4444' },
+            ]),
+          },
+          itemStyle: { color: '#ef4444' },
         },
         {
           name: '事件', type: 'scatter',
@@ -218,9 +223,32 @@ export default function Timeline() {
       })
     }
     if (option) chart.current.setOption(option, true)
-    const h = () => chart.current?.resize()
+
+    // Compute vertical SVG lines from dots to labels
+    const computeLines = () => {
+      const c = chart.current
+      const laid = laidRef.current
+      if (!c || !laid.length) { setSvgLines([]); return }
+      const results: { x: number; y1: number; y2: number }[] = []
+      for (const pt of laid) {
+        try {
+          const p = c.convertToPixel({ seriesIndex: 0 }, [pt.dateIdx, pt.price])
+          if (p && !isNaN(p[0]) && !isNaN(p[1])) {
+            results.push({ x: p[0], y1: p[1], y2: p[1] + pt.labelOff[1] })
+          }
+        } catch { /* chart not ready */ }
+      }
+      setSvgLines(results)
+    }
+    const timer = setTimeout(computeLines, 120)
+    chart.current.on('dataZoom', () => { setTimeout(computeLines, 30) })
+
+    const h = () => { chart.current?.resize(); setTimeout(computeLines, 80) }
     window.addEventListener('resize', h)
-    return () => window.removeEventListener('resize', h)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('resize', h)
+    }
   }, [option])
 
   useEffect(() => { return () => { chart.current?.dispose(); chart.current = null } }, [])
@@ -266,7 +294,17 @@ export default function Timeline() {
         <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" /></div>
       ) : (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-          <div ref={chartRef} style={{ width: '100%', height: 560 }} />
+          <div style={{ position: 'relative' }}>
+            <div ref={chartRef} style={{ width: '100%', height: 560 }} />
+            {svgLines.length > 0 && (
+              <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+                {svgLines.map((l, i) => (
+                  <line key={i} x1={l.x} y1={l.y1} x2={l.x} y2={l.y2}
+                    stroke="rgba(148,163,184,0.45)" strokeWidth={1} strokeDasharray="3 3" />
+                ))}
+              </svg>
+            )}
+          </div>
         </div>
       )}
 
