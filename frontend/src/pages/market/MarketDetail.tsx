@@ -107,78 +107,81 @@ export default function MarketDetail() {
   useEffect(() => {
     if (!chartRef.current) return
 
+    // 确保实例存在
     if (!chartInstance.current) {
       chartInstance.current = echarts.init(chartRef.current)
       chartInstance.current.on('datazoom', handleDataZoom)
     }
 
+    const inst = chartInstance.current
+
     if (!kline.length) {
-      chartInstance.current.showLoading({ text: '加载中...', maskColor: 'rgba(255,255,255,0.7)' })
-      const handleResize = () => chartInstance.current?.resize()
-      window.addEventListener('resize', handleResize)
-      return () => window.removeEventListener('resize', handleResize)
-    }
-    chartInstance.current.hideLoading()
+      inst.showLoading({ text: '加载中...', maskColor: 'rgba(255,255,255,0.7)' })
+    } else {
+      inst.hideLoading()
 
-    const dates = kline.map(k => k.trade_date)
-    const ohlc = kline.map(k => [k.open, k.close, k.low, k.high])
-    const volumes = kline.map(k => k.volume)
-    const ma5 = calcMA(kline.map(k => k.close), 5)
-    const ma20 = calcMA(kline.map(k => k.close), 20)
-    const ma60 = calcMA(kline.map(k => k.close), 60)
+      const dates = kline.map(k => k.trade_date)
+      const ohlc = kline.map(k => [k.open, k.close, k.low, k.high])
+      const volumes = kline.map(k => k.volume)
+      const ma5 = calcMA(kline.map(k => k.close), 5)
+      const ma20 = calcMA(kline.map(k => k.close), 20)
+      const ma60 = calcMA(kline.map(k => k.close), 60)
 
-    const option: EChartsOption = {
-      animation: false,
-      tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
-      legend: {
-        data: [
-          { name: 'MA5', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
-          { name: 'MA20', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
-          { name: 'MA60', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
+      const option: EChartsOption = {
+        animation: false,
+        tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+        legend: {
+          data: [
+            { name: 'MA5', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
+            { name: 'MA20', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
+            { name: 'MA60', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
+          ],
+          top: 0,
+          textStyle: { fontSize: 11 },
+        },
+        grid: [
+          { left: '8%', right: '4%', top: '10%', height: '55%' },
+          { left: '8%', right: '4%', top: '70%', height: '18%' },
         ],
-        top: 0,
-        textStyle: { fontSize: 11 },
-      },
-      grid: [
-        { left: '8%', right: '4%', top: '10%', height: '55%' },
-        { left: '8%', right: '4%', top: '70%', height: '18%' },
-      ],
-      xAxis: [
-        { type: 'category', data: dates, gridIndex: 0, axisLabel: { show: false }, boundaryGap: true },
-        { type: 'category', data: dates, gridIndex: 1, axisLabel: { fontSize: 10 } },
-      ],
-      yAxis: [
-        { type: 'value', gridIndex: 0, scale: true, splitArea: { show: true, areaStyle: { color: ['rgba(250,250,250,0.1)', 'rgba(200,200,200,0.05)'] } } },
-        { type: 'value', gridIndex: 1, splitNumber: 2, axisLabel: { fontSize: 10 } },
-      ],
-      dataZoom: [
-        { type: 'inside', xAxisIndex: [0, 1], start: visibleRange[0], end: visibleRange[1] },
-        { type: 'slider', xAxisIndex: [0, 1], start: visibleRange[0], end: visibleRange[1], top: '93%', height: 20 },
-      ],
-      series: [
-        {
-          name: 'K线', type: 'candlestick', data: ohlc, xAxisIndex: 0, yAxisIndex: 0,
-          itemStyle: { color: BULLISH_COLOR, color0: BEARISH_COLOR, borderColor: BULLISH_COLOR, borderColor0: BEARISH_COLOR },
-        },
-        { name: 'MA5', type: 'line', data: ma5, smooth: true, lineStyle: { width: 1, color: '#f59e0b' }, symbol: 'none', xAxisIndex: 0, yAxisIndex: 0 },
-        { name: 'MA20', type: 'line', data: ma20, smooth: true, lineStyle: { width: 1, color: '#3b82f6' }, symbol: 'none', xAxisIndex: 0, yAxisIndex: 0 },
-        { name: 'MA60', type: 'line', data: ma60, smooth: true, lineStyle: { width: 1, color: '#8b5cf6' }, symbol: 'none', xAxisIndex: 0, yAxisIndex: 0 },
-        {
-          name: '成交量', type: 'bar', data: volumes, xAxisIndex: 1, yAxisIndex: 1,
-          itemStyle: { color: (params: any) => {
-            const idx = params.dataIndex
-            return ohlc[idx][1] >= ohlc[idx][0] ? BULLISH_COLOR : BEARISH_COLOR
-          }},
-        },
-      ],
-    }
+        xAxis: [
+          { type: 'category', data: dates, gridIndex: 0, axisLabel: { show: false }, boundaryGap: true },
+          { type: 'category', data: dates, gridIndex: 1, axisLabel: { fontSize: 10 } },
+        ],
+        yAxis: [
+          { type: 'value', gridIndex: 0, scale: true, splitArea: { show: true, areaStyle: { color: ['rgba(250,250,250,0.1)', 'rgba(200,200,200,0.05)'] } } },
+          { type: 'value', gridIndex: 1, splitNumber: 2, axisLabel: { fontSize: 10 } },
+        ],
+        dataZoom: [
+          { type: 'inside', xAxisIndex: [0, 1], start: 70, end: 100 },
+          { type: 'slider', xAxisIndex: [0, 1], start: 70, end: 100, top: '93%', height: 20 },
+        ],
+        series: [
+          {
+            name: 'K线', type: 'candlestick', data: ohlc, xAxisIndex: 0, yAxisIndex: 0,
+            itemStyle: { color: BULLISH_COLOR, color0: BEARISH_COLOR, borderColor: BULLISH_COLOR, borderColor0: BEARISH_COLOR },
+          },
+          { name: 'MA5', type: 'line', data: ma5, smooth: true, lineStyle: { width: 1, color: '#f59e0b' }, symbol: 'none', xAxisIndex: 0, yAxisIndex: 0 },
+          { name: 'MA20', type: 'line', data: ma20, smooth: true, lineStyle: { width: 1, color: '#3b82f6' }, symbol: 'none', xAxisIndex: 0, yAxisIndex: 0 },
+          { name: 'MA60', type: 'line', data: ma60, smooth: true, lineStyle: { width: 1, color: '#8b5cf6' }, symbol: 'none', xAxisIndex: 0, yAxisIndex: 0 },
+          {
+            name: '成交量', type: 'bar', data: volumes, xAxisIndex: 1, yAxisIndex: 1,
+            itemStyle: { color: (params: any) => {
+              const idx = params.dataIndex
+              return ohlc[idx][1] >= ohlc[idx][0] ? BULLISH_COLOR : BEARISH_COLOR
+            }},
+          },
+        ],
+      }
 
-    chartInstance.current.setOption(option, true)
+      inst.setOption(option, true)
+      // 确保容器尺寸正确
+      setTimeout(() => inst.resize(), 0)
+    }
 
     const handleResize = () => chartInstance.current?.resize()
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [kline])
+  }, [kline, handleDataZoom])
 
   useEffect(() => {
     return () => {
