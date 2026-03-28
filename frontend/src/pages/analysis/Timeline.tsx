@@ -225,7 +225,7 @@ export default function Timeline() {
     }
     if (option) chart.current.setOption(option, true)
 
-    // Compute L-shape SVG lines: vertical from dot, then horizontal to label
+    // Compute SVG lines: vertical from dot, then angled to label
     const computeLines = () => {
       const c = chart.current
       const laid = laidRef.current
@@ -237,9 +237,11 @@ export default function Timeline() {
           if (p && !isNaN(p[0]) && !isNaN(p[1])) {
             const dotX = p[0]
             const dotY = p[1]
-            const elbowY = dotY + pt.labelOff[1]  // vertical end = label Y
-            const labelX = dotX + pt.labelOff[0]   // horizontal end = label X
-            results.push({ x1: dotX, y1: dotY, x2: dotX, y2: elbowY, x3: labelX, y3: elbowY })
+            // Elbow point: vertically 70% of the way, then angle to label
+            const elbowY = dotY + pt.labelOff[1] * 0.7
+            const labelX = dotX + pt.labelOff[0]
+            const labelY = dotY + pt.labelOff[1]
+            results.push({ x1: dotX, y1: dotY, x2: dotX, y2: elbowY, x3: labelX, y3: labelY })
           }
         } catch { /* chart not ready */ }
       }
