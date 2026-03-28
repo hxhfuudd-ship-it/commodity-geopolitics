@@ -105,7 +105,7 @@ export default function MarketDetail() {
 
   // ECharts 初始化和更新
   useEffect(() => {
-    if (!chartRef.current || !kline.length) return
+    if (!chartRef.current) return
 
     if (!chartInstance.current) {
       chartInstance.current = echarts.init(chartRef.current)
@@ -113,6 +113,12 @@ export default function MarketDetail() {
       const handleResize = () => chartInstance.current?.resize()
       window.addEventListener('resize', handleResize)
     }
+
+    if (!kline.length) {
+      chartInstance.current.showLoading({ text: '加载中...', maskColor: 'rgba(255,255,255,0.7)' })
+      return
+    }
+    chartInstance.current.hideLoading()
 
     const dates = kline.map(k => k.trade_date)
     const ohlc = kline.map(k => [k.open, k.close, k.low, k.high])
@@ -176,10 +182,6 @@ export default function MarketDetail() {
       chartInstance.current = null
     }
   }, [])
-
-  if (loading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" /></div>
-  }
 
   const pct = realtime?.change_pct ?? priceInfo?.change_pct ?? null
   const isUp = pct != null && pct > 0
