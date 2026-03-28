@@ -44,13 +44,14 @@ function layoutEvents(
     group.forEach((pt, gi) => {
       const isUp = gi % 2 === 0
       const tier = Math.floor(gi / 2)
-      const baseY = 38 + tier * 34
+      const baseY = 42 + tier * 36
       const yLabel = isUp ? -baseY : baseY
-      // Vertical lines — no horizontal spread
+      // Alternate horizontal offset for L-shape lines
+      const xOff = (gi % 4 < 2 ? -1 : 1) * (60 + tier * 20)
       out.push({
         ...pt,
         labelPos: isUp ? 'top' as const : 'bottom' as const,
-        labelOff: [0, yLabel] as [number, number],
+        labelOff: [xOff, yLabel] as [number, number],
       })
     })
   }
@@ -63,7 +64,7 @@ export default function Timeline() {
   const [symbol, setSymbol] = useState('AU')
   const [initialLoading, setInitialLoading] = useState(true)
   const [selectedEvent, setSelectedEvent] = useState<GeoEvent | null>(null)
-  const [svgLines, setSvgLines] = useState<{ x: number; y1: number; y2: number }[]>([])
+  const [svgLines, setSvgLines] = useState<{ x1: number; y1: number; x2: number; y2: number; x3: number; y3: number }[]>([])
   const chartRef = useRef<HTMLDivElement>(null)
   const chart = useRef<echarts.ECharts | null>(null)
   const laidRef = useRef<Laid[]>([])
@@ -224,17 +225,21 @@ export default function Timeline() {
     }
     if (option) chart.current.setOption(option, true)
 
-    // Compute vertical SVG lines from dots to labels
+    // Compute L-shape SVG lines: vertical from dot, then horizontal to label
     const computeLines = () => {
       const c = chart.current
       const laid = laidRef.current
       if (!c || !laid.length) { setSvgLines([]); return }
-      const results: { x: number; y1: number; y2: number }[] = []
+      const results: { x1: number; y1: number; x2: number; y2: number; x3: number; y3: number }[] = []
       for (const pt of laid) {
         try {
           const p = c.convertToPixel({ seriesIndex: 0 }, [pt.dateIdx, pt.price])
           if (p && !isNaN(p[0]) && !isNaN(p[1])) {
-            results.push({ x: p[0], y1: p[1], y2: p[1] + pt.labelOff[1] })
+            const dotX = p[0]
+            const dotY = p[1]
+            const elbowY = dotY + pt.labelOff[1]  // vertical end = label Y
+            const labelX = dotX + pt.labelOff[0]   // horizontal end = label X
+            results.push({ x1: dotX, y1: dotY, x2: dotX, y2: elbowY, x3: labelX, y3: elbowY })
           }
         } catch { /* chart not ready */ }
       }
@@ -299,8 +304,8 @@ export default function Timeline() {
             {svgLines.length > 0 && (
               <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
                 {svgLines.map((l, i) => (
-                  <line key={i} x1={l.x} y1={l.y1} x2={l.x} y2={l.y2}
-                    stroke="rgba(148,163,184,0.45)" strokeWidth={1} strokeDasharray="3 3" />
+                  <polyline key={i} points={`${l.x1},${l.y1} ${l.x2},${l.y2} ${l.x3},${l.y3}`}
+                    fill="none" stroke="rgba(148,163,184,0.45)" strokeWidth={1} strokeDasharray="3 3" />
                 ))}
               </svg>
             )}
