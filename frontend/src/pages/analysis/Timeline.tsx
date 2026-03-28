@@ -34,9 +34,9 @@ function layoutEvents(
     const isUp = i % 2 === 0
     const tier = Math.floor(i / 2)
     // Short vertical + moderate horizontal spread
-    const yOff = isUp ? -(28 + tier * 22) : (28 + tier * 22)
-    // Alternate left/right with increasing spread
-    const xOff = ((i % 4) < 2 ? -1 : 1) * (40 + (i % 3) * 25)
+    const yOff = isUp ? -(22 + tier * 16) : (22 + tier * 16)
+    // Alternate left/right with moderate spread
+    const xOff = ((i % 4) < 2 ? -1 : 1) * (20 + (i % 3) * 15)
     out.push({
       ...pt,
       labelPos: isUp ? 'top' as const : 'bottom' as const,
