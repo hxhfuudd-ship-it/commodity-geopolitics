@@ -18,6 +18,7 @@ export default function MarketDetail() {
 
   useEffect(() => {
     if (!symbol) return
+    setKline([])
     setLoading(true)
     marketApi.getKline(symbol)
       .then(data => {
@@ -105,15 +106,18 @@ export default function MarketDetail() {
 
   // ECharts 初始化和更新
   useEffect(() => {
-    if (!chartRef.current) return
+    const container = chartRef.current
+    if (!container) return
 
-    // 确保实例存在
-    if (!chartInstance.current) {
-      chartInstance.current = echarts.init(chartRef.current)
-      chartInstance.current.on('datazoom', handleDataZoom)
+    // 每次 symbol 变化时重建实例，避免残留状态
+    if (chartInstance.current) {
+      chartInstance.current.dispose()
+      chartInstance.current = null
     }
 
-    const inst = chartInstance.current
+    const inst = echarts.init(container)
+    chartInstance.current = inst
+    inst.on('datazoom', handleDataZoom)
 
     if (!kline.length) {
       inst.showLoading({ text: '加载中...', maskColor: 'rgba(255,255,255,0.7)' })
@@ -132,11 +136,13 @@ export default function MarketDetail() {
         tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
         legend: {
           data: [
-            { name: 'MA5', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
-            { name: 'MA20', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
-            { name: 'MA60', icon: 'path://M0,4 L25,4 L25,6 L0,6 Z' },
+            { name: 'MA5', icon: 'roundRect', itemStyle: { color: '#f59e0b' } },
+            { name: 'MA20', icon: 'roundRect', itemStyle: { color: '#3b82f6' } },
+            { name: 'MA60', icon: 'roundRect', itemStyle: { color: '#8b5cf6' } },
           ],
           top: 0,
+          itemWidth: 18,
+          itemHeight: 3,
           textStyle: { fontSize: 11 },
         },
         grid: [
@@ -174,13 +180,14 @@ export default function MarketDetail() {
       }
 
       inst.setOption(option, true)
-      // 确保容器尺寸正确
       setTimeout(() => inst.resize(), 0)
     }
 
     const handleResize = () => chartInstance.current?.resize()
     window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
   }, [kline, handleDataZoom])
 
   useEffect(() => {
