@@ -3,7 +3,7 @@ from loguru import logger
 
 from app.config import settings
 from app.tasks.market_tasks import fetch_market_data
-from app.tasks.news_tasks import fetch_news_data, process_news_ai, cleanup_old_news
+from app.tasks.news_tasks import cleanup_old_news
 from app.tasks.macro_tasks import fetch_macro_data
 
 scheduler = AsyncIOScheduler()
@@ -15,22 +15,6 @@ def init_scheduler():
         "interval",
         seconds=settings.AKSHARE_FETCH_INTERVAL,
         id="fetch_market_data",
-        replace_existing=True,
-        max_instances=1,
-    )
-    scheduler.add_job(
-        fetch_news_data,
-        "interval",
-        seconds=settings.NEWS_FETCH_INTERVAL,
-        id="fetch_news_data",
-        replace_existing=True,
-        max_instances=1,
-    )
-    scheduler.add_job(
-        process_news_ai,
-        "interval",
-        seconds=settings.NEWS_FETCH_INTERVAL + 60,
-        id="process_news_ai",
         replace_existing=True,
         max_instances=1,
     )
