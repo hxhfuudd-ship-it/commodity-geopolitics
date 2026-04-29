@@ -29,7 +29,7 @@ def init_scheduler():
     scheduler.add_job(
         process_news_ai,
         "interval",
-        seconds=settings.NEWS_FETCH_INTERVAL + 60,
+        seconds=1200,
         id="process_news_ai",
         replace_existing=True,
         max_instances=1,
