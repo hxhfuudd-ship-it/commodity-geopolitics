@@ -61,7 +61,7 @@ async def process_news_ai():
                 select(NewsArticle)
                 .where(NewsArticle.sentiment.is_(None))
                 .order_by(NewsArticle.published_at.desc())
-                .limit(20)
+                .limit(80)
             )
             articles = result.scalars().all()
 
