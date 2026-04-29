@@ -237,13 +237,20 @@ export default function Timeline() {
       }
       setSvgLines(results)
     }
-    const timer = setTimeout(computeLines, 120)
-    chart.current.on('dataZoom', () => { setTimeout(computeLines, 30) })
+
+    // Wait for chart to finish rendering before computing lines
+    chart.current.on('finished', computeLines)
+    const timer = setTimeout(computeLines, 300)
+
+    const onZoom = () => { setTimeout(computeLines, 50) }
+    chart.current.on('dataZoom', onZoom)
 
     const h = () => { chart.current?.resize(); setTimeout(computeLines, 80) }
     window.addEventListener('resize', h)
     return () => {
       clearTimeout(timer)
+      chart.current?.off('finished', computeLines)
+      chart.current?.off('dataZoom', onZoom)
       window.removeEventListener('resize', h)
     }
   }, [option])

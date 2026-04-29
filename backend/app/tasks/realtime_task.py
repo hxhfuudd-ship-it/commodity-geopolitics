@@ -1,6 +1,6 @@
 import asyncio
 import json
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, time
 from decimal import Decimal
 from loguru import logger
 
@@ -19,6 +19,18 @@ _today_saved: set[str] = set()
 _today_date: date | None = None
 # Track last successful realtime update for staleness detection
 _last_realtime_success: datetime | None = None
+
+
+def _is_trading_hours() -> bool:
+    """中国期货交易时段: 日盘 9:00-15:00, 夜盘 21:00-02:30"""
+    now = datetime.now().time()
+    if date.today().weekday() >= 5:
+        return False
+    if time(9, 0) <= now <= time(15, 15):
+        return True
+    if now >= time(21, 0) or now <= time(2, 35):
+        return True
+    return False
 
 
 async def _load_commodity_configs():
@@ -376,8 +388,11 @@ async def _refresh_loop():
             logger.warning(f"实时行情刷新异常: {e}")
             consecutive_failures += 1
 
-        # 交易时段 3s，非交易时段退避
-        if consecutive_failures >= 3:
+        # 交易时段 3s，非交易时段大幅退避
+        trading = _is_trading_hours()
+        if not trading:
+            sleep_time = 120
+        elif consecutive_failures >= 3:
             sleep_time = 60
         elif consecutive_failures >= 1:
             sleep_time = 30

@@ -144,12 +144,29 @@ async def _fetch_eastmoney_api(client: httpx.AsyncClient, source: dict) -> list[
         resp = await client.get(source["url"])
         if resp.status_code != 200:
             return []
-        text = resp.text
-        # Remove JSONP wrapper
-        if "(" in text:
+        text = resp.text.strip()
+        # Remove JSONP wrapper or var assignment
+        if text.startswith("var "):
+            text = text.split("=", 1)[1].strip().rstrip(";")
+        elif "(" in text and text.endswith(")"):
             text = text[text.index("(") + 1:text.rindex(")")]
+        elif text.startswith("[") or text.startswith("{"):
+            pass
+        else:
+            # Try to find JSON in the response
+            for start_char in ["{", "["]:
+                idx = text.find(start_char)
+                if idx >= 0:
+                    text = text[idx:]
+                    break
+
         data = json.loads(text)
-        items = data.get("LivesList", []) or data.get("list", [])
+        items = []
+        if isinstance(data, dict):
+            items = data.get("LivesList", []) or data.get("list", []) or data.get("data", {}).get("list", [])
+        elif isinstance(data, list):
+            items = data
+
         for item in items[:30]:
             title = item.get("title", "") or item.get("Title", "")
             content = item.get("digest", "") or item.get("Content", "") or item.get("summary", "") or ""
