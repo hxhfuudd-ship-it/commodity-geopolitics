@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     DEEPSEEK_MODEL: str = "deepseek-chat"
 
     AKSHARE_FETCH_INTERVAL: int = 300
-    NEWS_FETCH_INTERVAL: int = 900
+    NEWS_FETCH_INTERVAL: int = 3600
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
