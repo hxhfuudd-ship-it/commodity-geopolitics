@@ -66,6 +66,8 @@ async def _supplement_today_from_eastmoney(db, commodity):
         if price <= 0:
             return
 
+        settle_val = float(row.get("settlement", 0)) if row.get("settlement") else 0
+
         # 获取昨日收盘价计算涨跌幅
         prev = (await db.execute(
             select(PriceDaily).where(PriceDaily.commodity_id == commodity.id)
@@ -81,6 +83,7 @@ async def _supplement_today_from_eastmoney(db, commodity):
             high=Decimal(str(row.get("high", price))),
             low=Decimal(str(row.get("low", price))),
             close=Decimal(str(price)),
+            settle=Decimal(str(settle_val)) if settle_val > 0 else None,
             volume=int(float(row.get("volume", 0))) if row.get("volume") else None,
             open_interest=int(float(row.get("position", 0))) if row.get("position") else None,
             change_pct=Decimal(str(round(change_pct, 4))),

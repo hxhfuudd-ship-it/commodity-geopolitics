@@ -1,6 +1,6 @@
 import asyncio
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal
 from loguru import logger
 
@@ -17,6 +17,8 @@ _task: asyncio.Task | None = None
 # Track whether we've saved today's close to DB
 _today_saved: set[str] = set()
 _today_date: date | None = None
+# Track last successful realtime update for staleness detection
+_last_realtime_success: datetime | None = None
 
 
 async def _load_commodity_configs():
@@ -269,6 +271,8 @@ async def _refresh_loop():
     """Background loop: batch-fetch all realtime prices via push2 API.
     One HTTP request for all 20 commodities, updates cache immediately.
     Falls back to individual fetch if push2 fails."""
+    global _last_realtime_success
+
     await _load_commodity_configs()
     logger.info(f"实时行情后台任务启动，共 {len(_commodity_configs)} 个品种（push2 批量获取）")
 
@@ -328,6 +332,7 @@ async def _refresh_loop():
                 # 批量更新完立即写缓存
                 await cache_set("market:overview:realtime", list(snapshot.values()), ttl=300)
             else:
+                logger.warning("push2 批量获取返回空数据，回退到逐个获取")
                 # push2 失败，回退到逐个获取
                 for cfg in _commodity_configs:
                     try:
@@ -345,15 +350,27 @@ async def _refresh_loop():
             if items and realtime_success > 0:
                 await cache_set("market:overview:realtime", items, ttl=300)
                 await _save_realtime_to_db(items)
+                _last_realtime_success = datetime.now()
+                consecutive_failures = 0
             elif items:
                 existing_cache = await cache_get("market:overview:realtime")
                 if not existing_cache:
                     await cache_set("market:overview:realtime", items, ttl=7200)
-
-            if realtime_success == 0:
                 consecutive_failures += 1
             else:
-                consecutive_failures = 0
+                consecutive_failures += 1
+
+            # Staleness detection: if no realtime success for 10+ minutes, force DB refresh
+            if consecutive_failures > 0 and consecutive_failures % 20 == 0:
+                logger.warning(f"实时行情连续失败 {consecutive_failures} 次，强制从DB刷新缓存")
+                db_items = await _fetch_all_from_db()
+                if db_items:
+                    for item in db_items:
+                        _update_snapshot(item["symbol"], item)
+                    await cache_set("market:overview:realtime", list(snapshot.values()), ttl=7200)
+
+            if consecutive_failures > 0 and consecutive_failures % 5 == 0:
+                logger.warning(f"实时行情连续失败 {consecutive_failures} 次，sleep_time 已增加")
 
         except Exception as e:
             logger.warning(f"实时行情刷新异常: {e}")
