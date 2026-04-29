@@ -85,7 +85,7 @@ export default function Backtest() {
       name: COMMODITIES.find(c => c.symbol === symbol)?.name || symbol,
       type: 'line' as const,
       data: d.prices,
-      smooth: 0.15,
+      smooth: 0.4,
       color: COLORS[idx % COLORS.length],
       lineStyle: { width: 2 },
       itemStyle: { color: COLORS[idx % COLORS.length] },
@@ -94,7 +94,7 @@ export default function Backtest() {
 
     return {
       tooltip: { trigger: 'axis' },
-      legend: { data: series.map(s => s.name), top: 0 },
+      legend: { data: series.map(s => s.name), top: 0, icon: 'roundRect', itemWidth: 14, itemHeight: 3 },
       grid: { left: '8%', right: '4%', top: '12%', bottom: '15%' },
       xAxis: { type: 'category', data: firstDates },
       yAxis: { type: 'value', scale: true, name: '归一化 (事件日=100)' },
@@ -141,7 +141,7 @@ export default function Backtest() {
         name: `${ev.event.title} (${ev.event.start_date})`,
         type: 'line' as const,
         data: ev.prices,
-        smooth: 0.15,
+        smooth: 0.4,
         lineStyle: { width: 2, color: COLORS[idx % COLORS.length] },
         itemStyle: { color: COLORS[idx % COLORS.length] },
         symbol: 'none' as const,
@@ -170,7 +170,7 @@ export default function Backtest() {
 
     return {
       tooltip: { trigger: 'axis' },
-      legend: { top: 0, type: 'scroll' },
+      legend: { top: 0, type: 'scroll', icon: 'roundRect', itemWidth: 14, itemHeight: 3 },
       grid: { left: '8%', right: '4%', top: '14%', bottom: '15%' },
       xAxis: { type: 'category', data: xDays.map(d => `T${d >= 0 ? '+' : ''}${d}`) },
       yAxis: { type: 'value', scale: true, name: '归一化 (事件日=100)' },
