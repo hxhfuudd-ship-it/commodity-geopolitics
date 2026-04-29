@@ -255,8 +255,28 @@ async def fetch_macro_indicator(indicator_code: str) -> pd.DataFrame:
         import akshare as ak
 
         def _fetch_dxy():
-            """美元指数 (ICE DXY) — 优先东方财富，备用 Yahoo Finance"""
-            # 优先用 akshare 东方财富接口（不会被限流）
+            """美元指数 (ICE DXY) — 多源尝试"""
+            # 方法1: 新浪外汇接口（大陆可用）
+            try:
+                import requests as _req
+                url = "https://hq.sinajs.cn/rn=1&list=fx_sdxy"
+                headers = {"Referer": "https://finance.sina.com.cn"}
+                resp = _req.get(url, headers=headers, timeout=10)
+                text = resp.text
+                if "=" in text:
+                    val_str = text.split('"')[1]
+                    parts = val_str.split(",")
+                    if len(parts) > 0:
+                        current_val = float(parts[0])
+                        if current_val > 0:
+                            from datetime import date as _date
+                            today = _date.today()
+                            # 新浪只返回实时值，查DB补历史，只更新今天
+                            return pd.DataFrame([{"date": today, "value": current_val}])
+            except Exception as e:
+                logger.debug(f"DXY 新浪外汇接口获取失败: {e}")
+
+            # 方法2: akshare 东方财富全球指数
             try:
                 df = ak.index_global_hist_em(symbol="美元指数")
                 if df is not None and not df.empty:
@@ -268,11 +288,12 @@ async def fetch_macro_indicator(indicator_code: str) -> pd.DataFrame:
                     if not result.empty:
                         return result
             except Exception as e:
-                logger.debug(f"DXY 东方财富获取失败: {e}")
-            # 备用 yfinance
+                logger.debug(f"DXY akshare获取失败: {e}")
+
+            # 方法3: yfinance 备用
             import yfinance as yf
             import time
-            for attempt in range(3):
+            for attempt in range(2):
                 try:
                     df = yf.download('DX-Y.NYB', start='2008-01-01', progress=False)
                     if df is not None and not df.empty:
@@ -286,7 +307,7 @@ async def fetch_macro_indicator(indicator_code: str) -> pd.DataFrame:
                         return df.dropna().sort_values("date").reset_index(drop=True)
                 except Exception as e:
                     logger.debug(f"DXY yfinance attempt {attempt+1} failed: {e}")
-                    if attempt < 2:
+                    if attempt < 1:
                         time.sleep(10)
             return pd.DataFrame()
 

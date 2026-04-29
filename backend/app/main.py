@@ -16,6 +16,7 @@ from app.tasks.scheduler import init_scheduler, shutdown_scheduler
 from app.tasks.realtime_task import start_realtime_task, stop_realtime_task, prefill_cache
 from app.tasks.news_tasks import fetch_news_data, process_news_ai
 from app.tasks.market_tasks import fetch_market_data
+from app.tasks.macro_tasks import fetch_macro_data
 
 
 @asynccontextmanager
@@ -40,6 +41,14 @@ async def lifespan(app: FastAPI):
         logger.info("启动日线数据刷新完成")
     except Exception as e:
         logger.warning(f"启动日线数据刷新失败: {e}")
+
+    # Startup: refresh macro indicators
+    try:
+        logger.info("启动时刷新宏观指标数据...")
+        await fetch_macro_data()
+        logger.info("启动宏观指标刷新完成")
+    except Exception as e:
+        logger.warning(f"启动宏观指标刷新失败: {e}")
 
     await prefill_cache()
     start_realtime_task()

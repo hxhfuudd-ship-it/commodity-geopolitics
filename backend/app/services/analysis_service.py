@@ -166,19 +166,28 @@ async def get_macro_comparison(
     base_dates = sorted(price_map.keys()) if price_map else sorted(indicator_map.keys())
 
     # Forward-fill: for each base date, use the most recent indicator value
+    # but stop filling after 5 days gap to avoid flat lines from stale data
     indicator_values = []
     last_val = None
+    last_real_date = None
+    max_fill_days = 5
     # Pre-seed with the latest indicator value before our date range
     for d in all_indicator_dates:
         if base_dates and d < base_dates[0]:
             last_val = indicator_map[d]
+            last_real_date = d
         else:
             break
 
     for d in base_dates:
         if d in indicator_map:
             last_val = indicator_map[d]
-        indicator_values.append(last_val)
+            last_real_date = d
+            indicator_values.append(last_val)
+        elif last_val is not None and last_real_date is not None and (d - last_real_date).days <= max_fill_days:
+            indicator_values.append(last_val)
+        else:
+            indicator_values.append(None)
 
     return MacroComparisonOut(
         indicator_code=indicator_code,
